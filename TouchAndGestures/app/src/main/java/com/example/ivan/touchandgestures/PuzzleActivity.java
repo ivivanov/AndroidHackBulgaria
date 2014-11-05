@@ -1,15 +1,21 @@
 package com.example.ivan.touchandgestures;
 
+import android.animation.AnimatorSet;
+import android.animation.Keyframe;
+import android.animation.ObjectAnimator;
+import android.animation.PropertyValuesHolder;
+import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.content.res.TypedArray;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.view.DragEvent;
+import android.view.Gravity;
 import android.view.View;
+import android.widget.GridLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.Toast;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -19,11 +25,11 @@ import java.util.Objects;
 public class PuzzleActivity extends Activity {
     private final int rowsCount = 4;
     private final int colsCount = 4;
-    private final LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT, 0.25f);
     private Toast toast;
     private TypedArray puzzlePieces;
     private List<ImageView> puzzleImages;
     private LinearLayout[] rows = new LinearLayout[4];
+    private GridLayout grid;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -31,7 +37,8 @@ public class PuzzleActivity extends Activity {
         setContentView(R.layout.puzzle_layout);
         this.puzzlePieces = getResources().obtainTypedArray(R.array.puzzels);
         this.puzzleImages = new ArrayList<ImageView>(this.puzzlePieces.length());
-        this.toast = Toast.makeText(this, "You win this game!", Toast.LENGTH_SHORT);
+        this.toast = Toast.makeText(this, "Bravo", Toast.LENGTH_LONG);
+        this.grid = (GridLayout) findViewById(R.id.grid);
 
         InitScreen();
     }
@@ -43,18 +50,10 @@ public class PuzzleActivity extends Activity {
         }
         this.puzzlePieces.recycle();
         Collections.shuffle(this.puzzleImages);
-        LinearLayout currentView = (LinearLayout) findViewById(R.id.main);
 
-        int counter = 0;
-        for (int i = 0; i < this.rowsCount; i++) {
-            LinearLayout row = new LinearLayout(this);
-            this.rows[i] = row;
-            currentView.addView(row);
-            for (int j = 0; j < this.colsCount; j++) {
-                row.addView(this.puzzleImages.get(counter++));
-            }
+        for (int i = 0; i < this.puzzleImages.size(); i++) {
+            grid.addView(this.puzzleImages.get(i));
         }
-        return;
     }
 
     private ImageView CreateDragableImageView(int i) {
@@ -62,6 +61,9 @@ public class PuzzleActivity extends Activity {
         piece.setTag(i);
         Drawable pieceDr = this.puzzlePieces.getDrawable(i);
         piece.setImageDrawable(pieceDr);
+        GridLayout.LayoutParams params = new GridLayout.LayoutParams();
+        params.width = 120;
+        params.setGravity(Gravity.LEFT | Gravity.TOP);
         piece.setLayoutParams(params);
         piece.setAdjustViewBounds(true);
 
@@ -87,29 +89,38 @@ public class PuzzleActivity extends Activity {
                 final int action = dragEvent.getAction();
                 if (action == DragEvent.ACTION_DROP) {
                     ImageView otherView = ((ImageView) dragEvent.getLocalState());
+
                     Object tempTag = view.getTag();
                     Object otherTag = otherView.getTag();
-                    Drawable other = otherView.getDrawable();
-                    Drawable tempImg = ((ImageView) view).getDrawable();
 
-                    ((ImageView) view).setImageDrawable(other);
+                    otherView.setTag(tempTag);
                     view.setTag(otherTag);
 
-                    otherView.setImageDrawable(tempImg);
-                    otherView.setTag(tempTag);
-                    ((ImageView)view).setImageAlpha(255);
+                    ((ImageView) view).setImageAlpha(255);
+
+                    // Animation
+                    PropertyValuesHolder x = PropertyValuesHolder.ofFloat("x", view.getX());
+                    PropertyValuesHolder y = PropertyValuesHolder.ofFloat("y", view.getY());
+                    PropertyValuesHolder otherX = PropertyValuesHolder.ofFloat("x", otherView.getX());
+                    PropertyValuesHolder otherY = PropertyValuesHolder.ofFloat("y", otherView.getY());
+                    ObjectAnimator anim = ObjectAnimator.ofPropertyValuesHolder(view, otherX, otherY);
+                    ObjectAnimator otherAnim = ObjectAnimator.ofPropertyValuesHolder(otherView, x, y);
+                    AnimatorSet animSetXY = new AnimatorSet();
+                    animSetXY.playTogether(anim, otherAnim);
+                    animSetXY.setDuration(1000);
+                    animSetXY.start();
 
                     if (isGameWon()) {
                         toast.show();
                     }
                 }
 
-                if (action == DragEvent.ACTION_DRAG_ENTERED){
-                    ((ImageView)view).setImageAlpha(150);
+                if (action == DragEvent.ACTION_DRAG_ENTERED) {
+                    ((ImageView) view).setImageAlpha(150);
                 }
 
-                if(action == DragEvent.ACTION_DRAG_EXITED){
-                    ((ImageView)view).setImageAlpha(255);
+                if (action == DragEvent.ACTION_DRAG_EXITED) {
+                    ((ImageView) view).setImageAlpha(255);
                 }
                 return true;
             }
@@ -119,17 +130,9 @@ public class PuzzleActivity extends Activity {
     }
 
     private boolean isGameWon() {
-        int counter = 0;
-        for (int i = 0; i < this.rowsCount; i++) {
-            LinearLayout currentRow = this.rows[i];
-            for (int j = 0; j < this.colsCount; j++) {
-                ImageView imageView = (ImageView) currentRow.getChildAt(j);
-                int tag = Integer.parseInt(imageView.getTag().toString());
-                if (tag != counter) {
-                    return false;
-                }
-                counter++;
-            }
+        for (int i = 0; i < 16; i++) {
+            int tag = Integer.parseInt(grid.getChildAt(i).getTag().toString());
+            if (tag != i) return  false;
         }
         return true;
     }
